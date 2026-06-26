@@ -708,7 +708,7 @@ function BlockPlacementGame() {
     <div ref={containerRef} style={{
       position: 'relative', width: '100%', height: '100dvh', maxHeight: '100dvh', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'flex-start', fontFamily: INTER, color: '#e8e8e8',
-      padding: '6px 8px calc(8px + env(safe-area-inset-bottom))', gap: '6px', overflow: 'hidden', boxSizing: 'border-box',
+      padding: 'calc(10px + env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom))', gap: '6px', overflow: 'hidden', boxSizing: 'border-box',
       WebkitTapHighlightColor: 'transparent', userSelect: 'none',
     }}>
       <style>{`
@@ -772,11 +772,6 @@ function BlockPlacementGame() {
       `}</style>
 
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }} />
-
-      <button onClick={() => setMuted(m => !m)} aria-label="toggle sound"
-        style={{ position: 'fixed', top: '8px', right: '8px', zIndex: 60, fontSize: '18px', lineHeight: 1, padding: '8px 10px', borderRadius: '8px', border: '2px solid #00E5FF', background: 'rgba(0,0,0,0.6)', color: '#00E5FF', cursor: 'pointer', touchAction: 'manipulation' }}>
-        {muted ? '🔇' : '🔊'}
-      </button>
 
       {/* Particles with 3D perspective */}
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1000, pointerEvents: 'none', perspective: '1000px' }}>
@@ -892,13 +887,19 @@ function BlockPlacementGame() {
         </div>
       </div>
 
-      {/* Reset Button */}
-      <button onClick={resetGame}
-        style={{ position: 'relative', zIndex: 2, fontFamily: ORBITRON, fontSize: '13px', fontWeight: 900, padding: '14px 28px', border: '3px solid #FFEA00', background: 'rgba(255, 234, 0, 0.15)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', transition: 'all 0.2s', borderRadius: '8px', boxShadow: '0 0 15px rgba(255,234,0,0.4)' }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 234, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 25px rgba(255,234,0,0.7)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 234, 0, 0.15)'; e.currentTarget.style.boxShadow = '0 0 15px rgba(255,234,0,0.4)'; }}>
-        🎮 New Game
-      </button>
+      {/* Bottom controls: New Game + sound toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+        <button onClick={resetGame}
+          style={{ position: 'relative', zIndex: 2, fontFamily: ORBITRON, fontSize: '13px', fontWeight: 900, padding: '14px 28px', border: '3px solid #FFEA00', background: 'rgba(255, 234, 0, 0.15)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', transition: 'all 0.2s', borderRadius: '8px', boxShadow: '0 0 15px rgba(255,234,0,0.4)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 234, 0, 0.35)'; e.currentTarget.style.boxShadow = '0 0 25px rgba(255,234,0,0.7)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 234, 0, 0.15)'; e.currentTarget.style.boxShadow = '0 0 15px rgba(255,234,0,0.4)'; }}>
+          🎮 New Game
+        </button>
+        <button onClick={() => setMuted(m => !m)} aria-label="toggle sound"
+          style={{ position: 'relative', zIndex: 2, fontSize: '20px', lineHeight: 1, padding: '12px 14px', borderRadius: '8px', border: '3px solid #00E5FF', background: 'rgba(0, 229, 255, 0.12)', color: '#00E5FF', cursor: 'pointer', touchAction: 'manipulation', boxShadow: '0 0 12px rgba(0,229,255,0.4)' }}>
+          {muted ? '🔇' : '🔊'}
+        </button>
+      </div>
       </div>{/* right column */}
       </div>{/* play area */}
 
