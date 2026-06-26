@@ -49,7 +49,7 @@
       ], function () {
         try {
           var srcText = document.getElementById('game-src').textContent;
-          var compiled = Babel.transform(srcText, { presets: ['react'], sourceType: 'script' }).code;
+          var compiled = Babel.transform(srcText, { presets: [['react', { runtime: 'classic' }]], sourceType: 'script' }).code;
           (0, eval)(compiled);
         } catch (e) {
           boot('Start-up error:\n\n' + (e && e.message ? e.message : e), true);
