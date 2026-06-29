@@ -451,6 +451,25 @@ function BlockPlacementGame() {
     });
   };
   const saidIntroRef = useRef(false);
+  // Descending "power-down" sting with a reverb tail, played once on Game Over.
+  const sfxGameOver = () => {
+    if (mutedRef.current) return;
+    const ac = getAudio(); const verb = getReverb(); if (!ac) return;
+    const notes = [523.25, 392.0, 311.13, 196.0]; // C5 -> G4 -> Eb4 -> G3
+    notes.forEach((f, i) => {
+      const t0 = ac.currentTime + i * 0.16;
+      const osc = ac.createOscillator(); const g = ac.createGain();
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(f, t0);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.94, t0 + 0.5);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.13, t0 + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.7);
+      osc.connect(g);
+      if (verb) g.connect(verb);   // spacey tail to match Ready/Go
+      g.connect(ac.destination);
+      osc.start(t0); osc.stop(t0 + 0.75);
+    });
+  };
   const pickVoice = () => {
     try {
       const vs = window.speechSynthesis.getVoices() || [];
@@ -507,6 +526,7 @@ function BlockPlacementGame() {
   const [linesTotal, setLinesTotal] = useState(0);
   const [level, setLevel] = useState(1);
   const [levelingUp, setLevelingUp] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
   const LINES_PER_LEVEL = 5;
 
   const [drag, setDrag] = useState(null);
@@ -585,6 +605,18 @@ function BlockPlacementGame() {
       if (g[row * GRID_COLS + col] !== null) return false;
     }
     return true;
+  };
+  // True if at least one remaining tray piece fits somewhere on the grid.
+  const canPlaceAnyPiece = (g, trayArr) => {
+    for (const piece of trayArr) {
+      if (!piece) continue;
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+          if (canPlace(g, piece.shape, r, c)) return true;
+        }
+      }
+    }
+    return false;
   };
 
   const clearLines = (g) => {
@@ -807,8 +839,20 @@ function BlockPlacementGame() {
     setLevelingUp(false);
     placeCountRef.current = 0;
     setSwapsLeft(3);
+    setGameOver(false);
     setTimeout(() => speakReadyGo(), 200); // "Ready? Go!" for the fresh game
   };
+
+  // Game over: no remaining piece fits anywhere and the player can't swap out of it.
+  // Kids mode has unlimited swaps, so it never hard-locks. Adult mode locks once swaps run out.
+  useEffect(() => {
+    if (gameOver || drag || celebrating) return;
+    if (clearingCells.size > 0) return;
+    if (!tray.some(p => p)) return;            // empty tray refills automatically
+    if (canPlaceAnyPiece(grid, tray)) return;  // something still fits
+    const canEscape = !adult || swapsLeft > 0; // a swap could still save you
+    if (!canEscape) { setShowSettings(false); setGameOver(true); sfxGameOver(); }
+  }, [grid, tray, swapsLeft, adult, celebrating, drag, clearingCells, gameOver]);
 
   // Flip kids <-> adult and start a clean game in the new mode.
   const toggleMode = () => {
@@ -1072,6 +1116,24 @@ function BlockPlacementGame() {
             <button onClick={() => setShowSettings(false)}
               style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', marginTop: '4px' }}>
               ✓ Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Game Over overlay */}
+      {gameOver && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 110, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '340px', background: 'rgba(15,15,18,0.98)', border: '3px solid #FF1744', borderRadius: '14px', boxShadow: '0 0 30px rgba(255,23,68,0.55)', padding: '26px 22px', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'center' }}>
+            <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '30px', color: '#FF1744', textTransform: 'uppercase', letterSpacing: '3px', textShadow: '0 0 14px #FF1744' }}>
+              Game Over
+            </div>
+            <div style={{ fontFamily: MONO, fontSize: '14px', color: '#FFEA00', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              No more moves! &nbsp;Score: {String(score).padStart(5, '0')}
+            </div>
+            <button onClick={resetGame}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', padding: '14px', borderRadius: '10px', border: '3px solid #00FF00', background: 'rgba(0,255,0,0.14)', color: '#00FF00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', textShadow: '0 0 8px #00FF00', marginTop: '4px' }}>
+              🎮 Play Again
             </button>
           </div>
         </div>
