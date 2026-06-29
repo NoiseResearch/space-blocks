@@ -285,7 +285,8 @@ function BlockPlacementGame() {
     '#FF1744', '#FF6D00', '#FFEA00', '#00E676', '#00B0FF', '#D500F9',
   ];
 
-  const SHAPES = [
+  // Easy shapes for kids: singles, dominoes, small triominoes, 2x2, small Ls
+  const KID_SHAPES = [
     [[0, 0]],
     [[0, 0], [0, 1]],
     [[0, 0], [1, 0]],
@@ -297,6 +298,26 @@ function BlockPlacementGame() {
     [[0, 1], [1, 0], [1, 1]],
     [[0, 0], [0, 1], [1, 0]],
   ];
+  // Hard shapes for adults: long bars, full tetrominoes, plus, big Ls, 2x3, 3x3 corner
+  const ADULT_SHAPES = [
+    [[0, 0], [0, 1], [0, 2], [0, 3]],            // I4 horizontal
+    [[0, 0], [1, 0], [2, 0], [3, 0]],            // I4 vertical
+    [[0, 0], [1, 0], [2, 0], [2, 1]],            // L tetromino
+    [[0, 1], [1, 1], [2, 1], [2, 0]],            // J tetromino
+    [[0, 0], [0, 1], [0, 2], [1, 1]],            // T tetromino
+    [[0, 1], [0, 2], [1, 0], [1, 1]],            // S tetromino
+    [[0, 0], [0, 1], [1, 1], [1, 2]],            // Z tetromino
+    [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],    // plus (5)
+    [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2]],    // big L (5)
+    [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]], // 2x3 block (6)
+    [[0, 0], [0, 1], [1, 0], [1, 1]],            // 2x2
+    [[0, 0], [0, 1], [0, 2]],                    // a few easier ones mixed in
+    [[0, 0], [1, 0], [2, 0]],
+  ];
+  const [adult, setAdult] = useState(false);
+  const adultRef = useRef(false);
+  useEffect(() => { adultRef.current = adult; }, [adult]);
+  const [showSettings, setShowSettings] = useState(false);
 
   const shapeDims = (shape) => ({
     w: Math.max(...shape.map(s => s[1] + 1)),
@@ -304,7 +325,8 @@ function BlockPlacementGame() {
   });
 
   const makeTrayPiece = () => {
-    const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+    const SET = adultRef.current ? ADULT_SHAPES : KID_SHAPES;
+    const shape = SET[Math.floor(Math.random() * SET.length)];
     const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
     return { uid: Math.random().toString(36).slice(2), shape, color };
   };
@@ -359,6 +381,17 @@ function BlockPlacementGame() {
     if (ac && ac.state === 'suspended') ac.resume();
     return ac;
   };
+  // Fully unlock iOS audio inside a user gesture: resume + play a 1-sample silent buffer.
+  // Without this, the FIRST placement sound is dropped while resume() is still pending,
+  // which is why sound only worked after toggling mute once.
+  const primeAudio = () => {
+    const ac = getAudio(); if (!ac) return;
+    try {
+      const buf = ac.createBuffer(1, 1, 22050);
+      const src = ac.createBufferSource();
+      src.buffer = buf; src.connect(ac.destination); src.start(0);
+    } catch (e) { /* ignore */ }
+  };
   const tone = (freq, dur, type, vol, when, slideTo) => {
     if (mutedRef.current) return;
     const ac = getAudio(); if (!ac) return;
@@ -378,30 +411,51 @@ function BlockPlacementGame() {
   const sfxLevel = () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.2, 'square', 0.13, i * 0.09)); };
   const sfxInvalid = () => { tone(150, 0.14, 'sawtooth', 0.10, 0, 95); };
   const saidIntroRef = useRef(false);
+  const pickVoice = () => {
+    try {
+      const vs = window.speechSynthesis.getVoices() || [];
+      return vs.find(v => /en[-_]US/i.test(v.lang) && /female|samantha|kid|child|zoe|princess/i.test(v.name))
+          || vs.find(v => /en[-_]US/i.test(v.lang))
+          || vs.find(v => /^en/i.test(v.lang)) || null;
+    } catch (e) { return null; }
+  };
   const speakReadyGo = () => {
     if (mutedRef.current) return;
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     try {
       const synth = window.speechSynthesis;
-      synth.cancel();
-      const mk = (text, pitch, rate) => { const u = new SpeechSynthesisUtterance(text); u.pitch = pitch; u.rate = rate; u.volume = 1; return u; };
-      synth.speak(mk('Ready?', 2, 0.92));   // pitch maxed (2) for a childlike voice
-      synth.speak(mk('Go!', 2, 1.18));
+      synth.resume();                       // iOS often leaves the queue paused, silencing timer-triggered calls
+      const voice = pickVoice();
+      const mk = (text, pitch, rate) => {
+        const u = new SpeechSynthesisUtterance(text);
+        u.pitch = pitch; u.rate = rate; u.volume = 1; u.lang = 'en-US';
+        if (voice) u.voice = voice;
+        return u;
+      };
+      synth.speak(mk('Ready?', 1.9, 0.95));   // high pitch for a childlike voice
+      synth.speak(mk('Go!', 2, 1.15));
     } catch (e) { /* speech not supported */ }
   };
   useEffect(() => {
     const unlock = () => {
-      const ac = getAudio(); if (ac && ac.state === 'suspended') ac.resume();
+      primeAudio();
       if (!saidIntroRef.current) { saidIntroRef.current = true; speakReadyGo(); } // level 1 intro on first tap
     };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('touchstart', unlock);
-    window.addEventListener('mousedown', unlock);
+    window.addEventListener('pointerdown', unlock, { capture: true });
+    window.addEventListener('touchstart', unlock, { capture: true });
+    window.addEventListener('mousedown', unlock, { capture: true });
     return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('touchstart', unlock);
-      window.removeEventListener('mousedown', unlock);
+      window.removeEventListener('pointerdown', unlock, { capture: true });
+      window.removeEventListener('touchstart', unlock, { capture: true });
+      window.removeEventListener('mousedown', unlock, { capture: true });
     };
+  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const warm = () => { try { window.speechSynthesis.getVoices(); } catch (e) {} };
+    warm();
+    try { window.speechSynthesis.onvoiceschanged = warm; } catch (e) {}
+    return () => { try { window.speechSynthesis.onvoiceschanged = null; } catch (e) {} };
   }, []);
   const [tray, setTray] = useState(makeTray());
   const [score, setScore] = useState(0);
@@ -589,6 +643,25 @@ function BlockPlacementGame() {
     setHoverCell(null);
   }, [grid, BLOCK_SIZE]);
 
+  // Adult-only "garbage": drop a few junk cells into random empty squares so the
+  // board steadily fills up, making the game faster and easier to get stuck in.
+  const placeCountRef = useRef(0);
+  const addGarbage = (count) => {
+    setGrid(prev => {
+      const empties = [];
+      for (let i = 0; i < prev.length; i++) if (prev[i] === null) empties.push(i);
+      // leave breathing room so we never instantly lock the board
+      if (empties.length <= count + GRID_COLS) return prev;
+      const g = [...prev];
+      for (let k = 0; k < count && empties.length; k++) {
+        const j = Math.floor(Math.random() * empties.length);
+        g[empties[j]] = '#5A5F6B'; // gray junk block
+        empties.splice(j, 1);
+      }
+      return g;
+    });
+  };
+
   const endDrag = useCallback((clientX, clientY) => {
     const d = dragRef.current;
     if (!d) return;
@@ -641,6 +714,12 @@ function BlockPlacementGame() {
           const next = prev.map((p, i) => (i === d.fromIdx ? null : p));
           return next.every(p => p === null) ? makeTray() : next;
         });
+        if (adultRef.current) {
+          placeCountRef.current += 1;
+          if (placeCountRef.current % 3 === 0) {
+            setTimeout(() => addGarbage(2), 560); // land after any line-clear removal
+          }
+        }
         placed = true;
       }
     }
@@ -685,7 +764,17 @@ function BlockPlacementGame() {
     setLinesTotal(0);
     setLevel(1);
     setLevelingUp(false);
+    placeCountRef.current = 0;
     setTimeout(() => speakReadyGo(), 200); // "Ready? Go!" for the fresh game
+  };
+
+  // Flip kids <-> adult and start a clean game in the new mode.
+  const toggleMode = () => {
+    const next = !adultRef.current;
+    adultRef.current = next;   // update synchronously so resetGame deals from the right shape set
+    setAdult(next);
+    setShowSettings(false);
+    resetGame();
   };
 
   const ORBITRON = "'Orbitron', sans-serif";
@@ -798,6 +887,7 @@ function BlockPlacementGame() {
         </h1>
         <div style={{ fontFamily: MONO, fontSize: '13px', color: '#FF1744', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>
           🎮 SCORE // {String(score).padStart(5, '0')}{'  '}// LV {level}
+          {adult && <span style={{ marginLeft: '8px', color: '#FF1744', border: '1.5px solid #FF1744', borderRadius: '5px', padding: '1px 6px', fontSize: '11px', textShadow: '0 0 6px #FF1744' }}>🔥 HARD</span>}
         </div>
       </div>
 
@@ -852,10 +942,10 @@ function BlockPlacementGame() {
           <div style={{ fontFamily: ORBITRON, fontSize: land ? '10px' : '13px', fontWeight: 900, color: '#D500F9', textTransform: 'uppercase', letterSpacing: land ? '1px' : '2px', textShadow: '0 0 8px #D500F9', textAlign: 'center' }}>
             🎨 {land ? 'Blocks' : 'Your Blocks'}
           </div>
-          <button onClick={() => setTray(makeTray())}
-            style={{ fontFamily: ORBITRON, fontSize: '11px', fontWeight: 900, padding: land ? '6px 10px' : '8px 14px', border: '2px solid #00E676', background: 'rgba(0, 230, 118, 0.15)', color: '#00E676', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', borderRadius: '7px', boxShadow: '0 0 10px rgba(0,230,118,0.4)', touchAction: 'manipulation', whiteSpace: 'nowrap' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 230, 118, 0.32)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0, 230, 118, 0.15)'; }}>
+          <button onClick={() => { if (!adult) setTray(makeTray()); }} disabled={adult}
+            style={{ fontFamily: ORBITRON, fontSize: '11px', fontWeight: 900, padding: land ? '6px 10px' : '8px 14px', border: '2px solid ' + (adult ? '#555' : '#00E676'), background: adult ? 'rgba(80,80,80,0.15)' : 'rgba(0, 230, 118, 0.15)', color: adult ? '#666' : '#00E676', cursor: adult ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '1px', borderRadius: '7px', boxShadow: adult ? 'none' : '0 0 10px rgba(0,230,118,0.4)', touchAction: 'manipulation', whiteSpace: 'nowrap', opacity: adult ? 0.6 : 1 }}
+            onMouseEnter={(e) => { if (!adult) e.currentTarget.style.background = 'rgba(0, 230, 118, 0.32)'; }}
+            onMouseLeave={(e) => { if (!adult) e.currentTarget.style.background = 'rgba(0, 230, 118, 0.15)'; }}>
             {land ? '🔄' : '🔄 New Shapes'}
           </button>
         </div>
@@ -887,7 +977,7 @@ function BlockPlacementGame() {
         </div>
       </div>
 
-      {/* Bottom controls: New Game + sound toggle */}
+      {/* Bottom controls: New Game + settings */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
         <button onClick={resetGame}
           style={{ position: 'relative', zIndex: 2, fontFamily: ORBITRON, fontSize: '13px', fontWeight: 900, padding: '14px 28px', border: '3px solid #FFEA00', background: 'rgba(255, 234, 0, 0.15)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', transition: 'all 0.2s', borderRadius: '8px', boxShadow: '0 0 15px rgba(255,234,0,0.4)' }}
@@ -895,11 +985,42 @@ function BlockPlacementGame() {
           onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 234, 0, 0.15)'; e.currentTarget.style.boxShadow = '0 0 15px rgba(255,234,0,0.4)'; }}>
           🎮 New Game
         </button>
-        <button onClick={() => setMuted(m => !m)} aria-label="toggle sound"
+        <button onClick={() => { primeAudio(); setShowSettings(true); }} aria-label="settings"
           style={{ position: 'relative', zIndex: 2, fontSize: '20px', lineHeight: 1, padding: '12px 14px', borderRadius: '8px', border: '3px solid #00E5FF', background: 'rgba(0, 229, 255, 0.12)', color: '#00E5FF', cursor: 'pointer', touchAction: 'manipulation', boxShadow: '0 0 12px rgba(0,229,255,0.4)' }}>
-          {muted ? '🔇' : '🔊'}
+          ⚙️
         </button>
       </div>
+
+      {/* Settings overlay */}
+      {showSettings && (
+        <div onClick={() => setShowSettings(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: '340px', background: 'rgba(15,15,18,0.98)', border: '3px solid #00E5FF', borderRadius: '14px', boxShadow: '0 0 28px rgba(0,229,255,0.45)', padding: '22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '20px', color: '#00E5FF', textTransform: 'uppercase', letterSpacing: '2px', textAlign: 'center', textShadow: '0 0 10px #00E5FF' }}>
+              ⚙️ Settings
+            </div>
+
+            <button onClick={() => { primeAudio(); setMuted(m => !m); }}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', padding: '14px', borderRadius: '10px', border: '3px solid ' + (muted ? '#FF6D00' : '#00E676'), background: muted ? 'rgba(255,109,0,0.14)' : 'rgba(0,230,118,0.14)', color: muted ? '#FF6D00' : '#00E676', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', touchAction: 'manipulation' }}>
+              {muted ? '🔇 Sound: Off' : '🔊 Sound: On'}
+            </button>
+
+            <button onClick={toggleMode}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', padding: '14px', borderRadius: '10px', border: '3px solid ' + (adult ? '#00E676' : '#FF1744'), background: adult ? 'rgba(0,230,118,0.14)' : 'rgba(255,23,68,0.14)', color: adult ? '#00E676' : '#FF1744', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', touchAction: 'manipulation' }}>
+              {adult ? '🧸 Kids Version' : '🔥 Adult Version'}
+            </button>
+            <div style={{ fontFamily: INTER, fontSize: '11px', color: '#888', textAlign: 'center', lineHeight: 1.4, marginTop: '-4px' }}>
+              {adult ? 'Hard mode: big shapes, junk blocks fill the board, no reshuffles.' : 'Easy mode: small shapes, gentle pace.'}
+            </div>
+
+            <button onClick={() => setShowSettings(false)}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', marginTop: '4px' }}>
+              ✓ Done
+            </button>
+          </div>
+        </div>
+      )}
       </div>{/* right column */}
       </div>{/* play area */}
 
