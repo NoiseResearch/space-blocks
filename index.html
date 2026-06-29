@@ -318,6 +318,7 @@ function BlockPlacementGame() {
   const adultRef = useRef(false);
   useEffect(() => { adultRef.current = adult; }, [adult]);
   const [showSettings, setShowSettings] = useState(false);
+  const [swapsLeft, setSwapsLeft] = useState(3); // limited reshuffles in adult mode
 
   const shapeDims = (shape) => ({
     w: Math.max(...shape.map(s => s[1] + 1)),
@@ -410,6 +411,45 @@ function BlockPlacementGame() {
   const sfxClear = (n) => { const base = 523.25; for (let i = 0; i <= Math.min(4, n + 1); i++) tone(base * Math.pow(1.2599, i + 2), 0.16, 'triangle', 0.17, i * 0.07); };
   const sfxLevel = () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.2, 'square', 0.13, i * 0.09)); };
   const sfxInvalid = () => { tone(150, 0.14, 'sawtooth', 0.10, 0, 95); };
+
+  // Lazily-built convolver reverb (generated impulse response = decaying noise).
+  const reverbRef = useRef(null);
+  const getReverb = () => {
+    const ac = getAudio(); if (!ac) return null;
+    if (!reverbRef.current) {
+      try {
+        const seconds = 2.6, decay = 2.4, rate = ac.sampleRate, len = Math.floor(rate * seconds);
+        const imp = ac.createBuffer(2, len, rate);
+        for (let ch = 0; ch < 2; ch++) {
+          const d = imp.getChannelData(ch);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+        }
+        const conv = ac.createConvolver(); conv.buffer = imp;
+        const wet = ac.createGain(); wet.gain.value = 0.9;
+        conv.connect(wet); wet.connect(ac.destination);
+        reverbRef.current = conv;
+      } catch (e) { reverbRef.current = null; }
+    }
+    return reverbRef.current;
+  };
+  // A soft cosmic shimmer with a long reverb tail, layered under "Ready? Go!".
+  const spaceyCue = () => {
+    if (mutedRef.current) return;
+    const ac = getAudio(); const verb = getReverb(); if (!ac) return;
+    const notes = [392, 587.33, 783.99]; // G4, D5, G5 rising sparkle
+    notes.forEach((f, i) => {
+      const t0 = ac.currentTime + i * 0.14;
+      const osc = ac.createOscillator(); const g = ac.createGain();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(f, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.08, t0 + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+      osc.connect(g);
+      if (verb) g.connect(verb);           // wet -> reverb tail
+      g.connect(ac.destination);           // a little dry too
+      osc.start(t0); osc.stop(t0 + 1.0);
+    });
+  };
   const saidIntroRef = useRef(false);
   const pickVoice = () => {
     try {
@@ -422,6 +462,7 @@ function BlockPlacementGame() {
   const speakReadyGo = () => {
     if (mutedRef.current) return;
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    spaceyCue();                            // reverberant shimmer under the voice for a spacey feel
     try {
       const synth = window.speechSynthesis;
       synth.resume();                       // iOS often leaves the queue paused, silencing timer-triggered calls
@@ -765,6 +806,7 @@ function BlockPlacementGame() {
     setLevel(1);
     setLevelingUp(false);
     placeCountRef.current = 0;
+    setSwapsLeft(3);
     setTimeout(() => speakReadyGo(), 200); // "Ready? Go!" for the fresh game
   };
 
@@ -942,12 +984,25 @@ function BlockPlacementGame() {
           <div style={{ fontFamily: ORBITRON, fontSize: land ? '10px' : '13px', fontWeight: 900, color: '#D500F9', textTransform: 'uppercase', letterSpacing: land ? '1px' : '2px', textShadow: '0 0 8px #D500F9', textAlign: 'center' }}>
             🎨 {land ? 'Blocks' : 'Your Blocks'}
           </div>
-          <button onClick={() => { if (!adult) setTray(makeTray()); }} disabled={adult}
-            style={{ fontFamily: ORBITRON, fontSize: '11px', fontWeight: 900, padding: land ? '6px 10px' : '8px 14px', border: '2px solid ' + (adult ? '#555' : '#00E676'), background: adult ? 'rgba(80,80,80,0.15)' : 'rgba(0, 230, 118, 0.15)', color: adult ? '#666' : '#00E676', cursor: adult ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '1px', borderRadius: '7px', boxShadow: adult ? 'none' : '0 0 10px rgba(0,230,118,0.4)', touchAction: 'manipulation', whiteSpace: 'nowrap', opacity: adult ? 0.6 : 1 }}
-            onMouseEnter={(e) => { if (!adult) e.currentTarget.style.background = 'rgba(0, 230, 118, 0.32)'; }}
-            onMouseLeave={(e) => { if (!adult) e.currentTarget.style.background = 'rgba(0, 230, 118, 0.15)'; }}>
-            {land ? '🔄' : '🔄 New Shapes'}
-          </button>
+          {(() => {
+            const out = adult && swapsLeft <= 0;
+            const onSwap = () => {
+              if (adult) {
+                if (swapsLeft <= 0) return;
+                setSwapsLeft(s => s - 1);
+              }
+              setTray(makeTray());
+            };
+            const label = land ? '🔄' : (adult ? '🔄 Swap (' + swapsLeft + ')' : '🔄 New Shapes');
+            return (
+              <button onClick={onSwap} disabled={out}
+                style={{ fontFamily: ORBITRON, fontSize: '11px', fontWeight: 900, padding: land ? '6px 10px' : '8px 14px', border: '2px solid ' + (out ? '#555' : '#00E676'), background: out ? 'rgba(80,80,80,0.15)' : 'rgba(0, 230, 118, 0.15)', color: out ? '#666' : '#00E676', cursor: out ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '1px', borderRadius: '7px', boxShadow: out ? 'none' : '0 0 10px rgba(0,230,118,0.4)', touchAction: 'manipulation', whiteSpace: 'nowrap', opacity: out ? 0.6 : 1 }}
+                onMouseEnter={(e) => { if (!out) e.currentTarget.style.background = 'rgba(0, 230, 118, 0.32)'; }}
+                onMouseLeave={(e) => { if (!out) e.currentTarget.style.background = 'rgba(0, 230, 118, 0.15)'; }}>
+                {label}
+              </button>
+            );
+          })()}
         </div>
         <div style={{ display: 'flex', flexDirection: land ? 'column' : 'row', gap: '12px', justifyContent: 'space-around', minHeight: land ? 'auto' : '80px', alignItems: 'center' }}>
           {tray.map((piece, idx) => {
@@ -1011,7 +1066,7 @@ function BlockPlacementGame() {
               {adult ? '🧸 Kids Version' : '🔥 Adult Version'}
             </button>
             <div style={{ fontFamily: INTER, fontSize: '11px', color: '#888', textAlign: 'center', lineHeight: 1.4, marginTop: '-4px' }}>
-              {adult ? 'Hard mode: big shapes, junk blocks fill the board, no reshuffles.' : 'Easy mode: small shapes, gentle pace.'}
+              {adult ? 'Hard mode: big shapes, junk blocks fill the board, only 3 swaps.' : 'Easy mode: small shapes, gentle pace.'}
             </div>
 
             <button onClick={() => setShowSettings(false)}
