@@ -344,7 +344,7 @@ function BlockPlacementGame() {
     const chromeW = 2 * 8 + 2 * 3 + (GRID_COLS - 1) * GAP;
     const chromeH = 2 * 8 + 2 * 3 + (GRID_ROWS - 1) * GAP;
     const bw = (Math.min(vw - 16, 460) - chromeW) / GRID_COLS;
-    const bh = (vh - 210 - chromeH) / GRID_ROWS;   // loose reserve; fit effect refines exactly
+    const bh = (vh - 232 - chromeH) / GRID_ROWS;   // reserve incl. credit line; fit effect refines exactly
     const block = Math.max(20, Math.min(56, Math.floor(Math.min(bw, bh))));
     return { block };
   };
@@ -387,6 +387,9 @@ function BlockPlacementGame() {
   // Without this, the FIRST placement sound is dropped while resume() is still pending,
   // which is why sound only worked after toggling mute once.
   const primeAudio = () => {
+    // Make Web Audio play through the "playback" session so the iOS silent/ring switch
+    // doesn't mute the game sound effects (speech already ignores the switch).
+    try { if (typeof navigator !== 'undefined' && navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     const ac = getAudio(); if (!ac) return;
     try {
       const buf = ac.createBuffer(1, 1, 22050);
@@ -1091,6 +1094,10 @@ function BlockPlacementGame() {
           style={{ position: 'relative', zIndex: 2, fontSize: '20px', lineHeight: 1, padding: '12px 14px', borderRadius: '8px', border: '3px solid #00E5FF', background: 'rgba(0, 229, 255, 0.12)', color: '#00E5FF', cursor: 'pointer', touchAction: 'manipulation', boxShadow: '0 0 12px rgba(0,229,255,0.4)' }}>
           ⚙️
         </button>
+      </div>
+
+      <div style={{ flexShrink: 0, fontFamily: MONO, fontSize: '10px', color: '#5A6472', textAlign: 'center', letterSpacing: '1px', marginTop: '2px' }}>
+        Developed by: Javier Quintero
       </div>
 
       {/* Settings overlay */}
