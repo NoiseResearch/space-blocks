@@ -53,6 +53,22 @@
       });
     });
   </script>
+  <!-- Firebase (global leaderboard) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script>
+    try {
+      firebase.initializeApp({
+        apiKey: "AIzaSyDx_zpqmlmMdlvDbvzdr9DetEwT_Qvj5Qs",
+        authDomain: "space-blocks-42c2c.firebaseapp.com",
+        projectId: "space-blocks-42c2c",
+        storageBucket: "space-blocks-42c2c.firebasestorage.app",
+        messagingSenderId: "256966681245",
+        appId: "1:256966681245:web:6aca08ab38ec1160662a74"
+      });
+      window.__db = firebase.firestore();
+    } catch (e) { window.__db = null; }
+  </script>
 </head>
 <body>
   <div id="root"><div id="boot">Loading Space Blocks...</div></div>
@@ -528,6 +544,11 @@ function BlockPlacementGame() {
   const [level, setLevel] = useState(1);
   const [levelingUp, setLevelingUp] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [topScores, setTopScores] = useState([]);
+  const [scoreSubmitted, setScoreSubmitted] = useState(false);
+  const [initials, setInitials] = useState('');
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [lbBusy, setLbBusy] = useState(false);
   const LINES_PER_LEVEL = 5;
 
   const [drag, setDrag] = useState(null);
@@ -826,6 +847,26 @@ function BlockPlacementGame() {
     };
   }, [drag, moveDrag, endDrag]);
 
+  // ---- Global leaderboard (Firebase Firestore) ----
+  const lbDb = () => (typeof window !== 'undefined' && window.__db ? window.__db : null);
+  const fetchTopScores = () => {
+    const db = lbDb(); if (!db) return;
+    setLbBusy(true);
+    db.collection('scores').orderBy('score', 'desc').limit(10).get()
+      .then(snap => { setTopScores(snap.docs.map(d => d.data())); setLbBusy(false); })
+      .catch(() => setLbBusy(false));
+  };
+  const submitScore = () => {
+    const ini = ((initials || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)) || 'AAA';
+    const db = lbDb();
+    const finalize = () => { setScoreSubmitted(true); fetchTopScores(); };
+    if (!db) { finalize(); return; }
+    setLbBusy(true);
+    db.collection('scores').add({ initials: ini, score: score, ts: Date.now() })
+      .then(finalize).catch(finalize);
+  };
+  const openLeaderboard = () => { setShowSettings(false); setShowLeaderboard(true); fetchTopScores(); };
+
   const resetGame = () => {
     setGrid(Array(GRID_ROWS * GRID_COLS).fill(null));
     setTray(makeTray());
@@ -841,6 +882,8 @@ function BlockPlacementGame() {
     placeCountRef.current = 0;
     setSwapsLeft(3);
     setGameOver(false);
+    setScoreSubmitted(false);
+    setInitials('');
     setTimeout(() => speakReadyGo(), 200); // "Ready? Go!" for the fresh game
   };
 
@@ -1119,6 +1162,11 @@ function BlockPlacementGame() {
               {adult ? 'Hard mode: big shapes, junk blocks fill the board, only 3 swaps.' : 'Easy mode: small shapes, gentle pace.'}
             </div>
 
+            <button onClick={openLeaderboard}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', padding: '14px', borderRadius: '10px', border: '3px solid #FFD700', background: 'rgba(255,215,0,0.14)', color: '#FFD700', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', touchAction: 'manipulation' }}>
+              🏆 Leaderboard
+            </button>
+
             <button onClick={() => setShowSettings(false)}
               style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', marginTop: '4px' }}>
               ✓ Done
@@ -1141,6 +1189,32 @@ function BlockPlacementGame() {
             <div style={{ fontFamily: MONO, fontSize: '14px', color: '#FFEA00', textTransform: 'uppercase', letterSpacing: '1px' }}>
               No more moves! &nbsp;Score: {String(score).padStart(5, '0')}
             </div>
+
+            {!scoreSubmitted ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
+                <div style={{ fontFamily: MONO, fontSize: '12px', color: '#00E5FF', letterSpacing: '1px' }}>ENTER YOUR INITIALS</div>
+                <input value={initials} maxLength={3} placeholder="AAA" inputMode="text" autoCapitalize="characters" autoCorrect="off"
+                  onChange={(e) => setInitials(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3))}
+                  style={{ width: '120px', textAlign: 'center', fontFamily: ORBITRON, fontWeight: 900, fontSize: '28px', letterSpacing: '8px', color: '#FFEA00', background: 'rgba(0,0,0,0.6)', border: '3px solid #FFEA00', borderRadius: '10px', padding: '8px 4px', textTransform: 'uppercase', outline: 'none' }} />
+                <button onClick={submitScore} disabled={lbBusy}
+                  style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px 18px', borderRadius: '10px', border: '3px solid #00FF00', background: 'rgba(0,255,0,0.14)', color: '#00FF00', cursor: lbBusy ? 'wait' : 'pointer', textTransform: 'uppercase', letterSpacing: '1px', touchAction: 'manipulation', opacity: lbBusy ? 0.6 : 1 }}>
+                  {lbBusy ? 'Saving…' : '💾 Submit Score'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '2px', textShadow: '0 0 8px #FFD700', marginBottom: '2px' }}>🏆 Top Scores</div>
+                {lbBusy && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888' }}>Loading…</div>}
+                {!lbBusy && topScores.length === 0 && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888' }}>No scores yet — you're first!</div>}
+                {topScores.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: MONO, fontSize: '14px', color: i === 0 ? '#FFD700' : '#CFE3FF', padding: '2px 8px', background: i % 2 ? 'rgba(255,255,255,0.04)' : 'transparent', borderRadius: '4px' }}>
+                    <span>{i + 1}. {s.initials}</span>
+                    <span>{String(s.score).padStart(5, '0')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <button onClick={resetGame}
               style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', padding: '14px', borderRadius: '10px', border: '3px solid #00FF00', background: 'rgba(0,255,0,0.14)', color: '#00FF00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', textShadow: '0 0 8px #00FF00', marginTop: '4px' }}>
               🎮 Play Again
@@ -1171,6 +1245,30 @@ function BlockPlacementGame() {
               </div>
             );
           })()}
+        </div>
+      )}
+      {/* Leaderboard overlay (viewable anytime from Settings) */}
+      {showLeaderboard && (
+        <div onClick={() => setShowLeaderboard(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: '340px', background: 'rgba(15,15,18,0.98)', border: '3px solid #FFD700', borderRadius: '14px', boxShadow: '0 0 28px rgba(255,215,0,0.45)', padding: '22px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '20px', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '2px', textAlign: 'center', textShadow: '0 0 10px #FFD700' }}>
+              🏆 Leaderboard
+            </div>
+            {lbBusy && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888', textAlign: 'center' }}>Loading…</div>}
+            {!lbBusy && topScores.length === 0 && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888', textAlign: 'center' }}>No scores yet</div>}
+            {topScores.map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: MONO, fontSize: '15px', color: i === 0 ? '#FFD700' : '#CFE3FF', padding: '4px 8px', background: i % 2 ? 'rgba(255,255,255,0.04)' : 'transparent', borderRadius: '4px' }}>
+                <span>{i + 1}. {s.initials}</span>
+                <span>{String(s.score).padStart(5, '0')}</span>
+              </div>
+            ))}
+            <button onClick={() => setShowLeaderboard(false)}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', marginTop: '6px' }}>
+              ✓ Done
+            </button>
+          </div>
         </div>
       )}
       {/* Developer credit, fixed to the bottom-left so it never affects the game layout */}
