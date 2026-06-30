@@ -1032,7 +1032,7 @@ function BlockPlacementGame() {
       <div style={{ position: 'relative', zIndex: 2, width: '100%', ...cardStyle, padding: land ? '12px' : '16px', border: '3px solid #D500F9', boxShadow: '0 0 15px rgba(213, 0, 249, 0.5)' }}>
         <div style={{ display: 'flex', flexDirection: land ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', gap: land ? '8px' : '0', marginBottom: land ? '10px' : '14px' }}>
           <div style={{ fontFamily: ORBITRON, fontSize: land ? '10px' : '13px', fontWeight: 900, color: '#D500F9', textTransform: 'uppercase', letterSpacing: land ? '1px' : '2px', textShadow: '0 0 8px #D500F9', textAlign: 'center' }}>
-            🎨 {land ? 'Blocks' : 'Your Blocks'}
+            {land ? 'Blocks' : 'Your Blocks'}
           </div>
           {(() => {
             const out = adult && swapsLeft <= 0;
@@ -1043,7 +1043,7 @@ function BlockPlacementGame() {
               }
               setTray(makeTray());
             };
-            const label = land ? '🔄' : (adult ? '🔄 Swap (' + swapsLeft + ')' : '🔄 New Shapes');
+            const label = land ? 'New' : (adult ? 'Swap (' + swapsLeft + ')' : 'New Shapes');
             return (
               <button onClick={onSwap} disabled={out}
                 style={{ fontFamily: ORBITRON, fontSize: '11px', fontWeight: 900, padding: land ? '6px 10px' : '8px 14px', border: '2px solid ' + (out ? '#555' : '#00E676'), background: out ? 'rgba(80,80,80,0.15)' : 'rgba(0, 230, 118, 0.15)', color: out ? '#666' : '#00E676', cursor: out ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '1px', borderRadius: '7px', boxShadow: out ? 'none' : '0 0 10px rgba(0,230,118,0.4)', touchAction: 'manipulation', whiteSpace: 'nowrap', opacity: out ? 0.6 : 1 }}
@@ -1113,7 +1113,7 @@ function BlockPlacementGame() {
 
             <button onClick={toggleMode}
               style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', padding: '14px', borderRadius: '10px', border: '3px solid ' + (adult ? '#00E676' : '#FF1744'), background: adult ? 'rgba(0,230,118,0.14)' : 'rgba(255,23,68,0.14)', color: adult ? '#00E676' : '#FF1744', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', touchAction: 'manipulation' }}>
-              {adult ? '🧸 Kids Version' : '🔥 Adult Version'}
+              {adult ? '🧸 Kids Mode' : '🔥 Hard Mode'}
             </button>
             <div style={{ fontFamily: INTER, fontSize: '11px', color: '#888', textAlign: 'center', lineHeight: 1.4, marginTop: '-4px' }}>
               {adult ? 'Hard mode: big shapes, junk blocks fill the board, only 3 swaps.' : 'Easy mode: small shapes, gentle pace.'}
