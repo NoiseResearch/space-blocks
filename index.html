@@ -315,21 +315,35 @@ function BlockPlacementGame() {
     [[0, 1], [1, 0], [1, 1]],
     [[0, 0], [0, 1], [1, 0]],
   ];
-  // Hard shapes for adults: long bars, full tetrominoes, plus, big Ls, 2x3, 3x3 corner
+  // Hard mode: the 7 real Tetris tetrominoes only (no rotation in-game, so include
+  // several orientations of each for fair variety). No plus/pentominoes/oversized blobs.
   const ADULT_SHAPES = [
-    [[0, 0], [0, 1], [0, 2], [0, 3]],            // I4 horizontal
-    [[0, 0], [1, 0], [2, 0], [3, 0]],            // I4 vertical
-    [[0, 0], [1, 0], [2, 0], [2, 1]],            // L tetromino
-    [[0, 1], [1, 1], [2, 1], [2, 0]],            // J tetromino
-    [[0, 0], [0, 1], [0, 2], [1, 1]],            // T tetromino
-    [[0, 1], [0, 2], [1, 0], [1, 1]],            // S tetromino
-    [[0, 0], [0, 1], [1, 1], [1, 2]],            // Z tetromino
-    [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],    // plus (5)
-    [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2]],    // big L (5)
-    [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]], // 2x3 block (6)
-    [[0, 0], [0, 1], [1, 0], [1, 1]],            // 2x2
-    [[0, 0], [0, 1], [0, 2]],                    // a few easier ones mixed in
-    [[0, 0], [1, 0], [2, 0]],
+    // I
+    [[0, 0], [0, 1], [0, 2], [0, 3]],
+    [[0, 0], [1, 0], [2, 0], [3, 0]],
+    // O
+    [[0, 0], [0, 1], [1, 0], [1, 1]],
+    // T (4 orientations)
+    [[0, 0], [0, 1], [0, 2], [1, 1]],
+    [[0, 1], [1, 0], [1, 1], [2, 1]],
+    [[1, 0], [1, 1], [1, 2], [0, 1]],
+    [[0, 0], [1, 0], [1, 1], [2, 0]],
+    // S (2)
+    [[0, 1], [0, 2], [1, 0], [1, 1]],
+    [[0, 0], [1, 0], [1, 1], [2, 1]],
+    // Z (2)
+    [[0, 0], [0, 1], [1, 1], [1, 2]],
+    [[0, 1], [1, 0], [1, 1], [2, 0]],
+    // L (4)
+    [[0, 0], [1, 0], [2, 0], [2, 1]],
+    [[0, 0], [0, 1], [0, 2], [1, 0]],
+    [[0, 0], [0, 1], [1, 1], [2, 1]],
+    [[1, 0], [1, 1], [1, 2], [0, 2]],
+    // J (4)
+    [[0, 1], [1, 1], [2, 1], [2, 0]],
+    [[0, 0], [1, 0], [1, 1], [1, 2]],
+    [[0, 0], [0, 1], [1, 0], [2, 0]],
+    [[0, 0], [0, 1], [0, 2], [1, 2]],
   ];
   const [adult, setAdult] = useState(false);
   const adultRef = useRef(false);
@@ -359,9 +373,9 @@ function BlockPlacementGame() {
     const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
     const chromeW = 2 * 8 + 2 * 3 + (GRID_COLS - 1) * GAP;
     const chromeH = 2 * 8 + 2 * 3 + (GRID_ROWS - 1) * GAP;
-    const bw = (Math.min(vw - 16, 460) - chromeW) / GRID_COLS;
+    const bw = (Math.min(vw - 12, 540) - chromeW) / GRID_COLS;
     const bh = (vh - 210 - chromeH) / GRID_ROWS;   // loose reserve; fit effect refines exactly
-    const block = Math.max(20, Math.min(56, Math.floor(Math.min(bw, bh))));
+    const block = Math.max(20, Math.min(72, Math.floor(Math.min(bw, bh))));
     return { block };
   };
   const [layout, setLayout] = useState(computeLayout);
@@ -428,7 +442,7 @@ function BlockPlacementGame() {
     osc.start(t0); osc.stop(t0 + dur + 0.03);
   };
   const sfxPlace = () => { tone(330, 0.09, 'triangle', 0.18, 0); tone(495, 0.07, 'sine', 0.10, 0.025); };
-  const sfxClear = (n) => { const base = 523.25; for (let i = 0; i <= Math.min(4, n + 1); i++) tone(base * Math.pow(1.2599, i + 2), 0.16, 'triangle', 0.17, i * 0.07); };
+  const sfxClear = (n, combo) => { const c = combo || 0; const base = 523.25 * Math.pow(1.05946, Math.min(c, 8) * 2); for (let i = 0; i <= Math.min(4, n + 1); i++) tone(base * Math.pow(1.2599, i + 2), 0.16, 'triangle', 0.17, i * 0.07); };
   const sfxLevel = () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.2, 'square', 0.13, i * 0.09)); };
   const sfxInvalid = () => { tone(150, 0.14, 'sawtooth', 0.10, 0, 95); };
 
@@ -742,6 +756,15 @@ function BlockPlacementGame() {
   // Adult-only "garbage": drop a few junk cells into random empty squares so the
   // board steadily fills up, making the game faster and easier to get stuck in.
   const placeCountRef = useRef(0);
+  const comboRef = useRef(0);            // consecutive clearing placements (Hard only)
+  const lastPlaceRef = useRef(0);        // timestamp for the speed bonus
+  const levelRef = useRef(1);
+  useEffect(() => { levelRef.current = level; }, [level]);
+  const [comboFlash, setComboFlash] = useState(0);   // shows "COMBO xN" when > 0
+  // Level ramp (Hard): combos and garbage escalate as you survive deeper.
+  const comboCap = (lv) => (lv >= 7 ? 4 : lv >= 5 ? 3 : 2);
+  const garbageInterval = (lv) => (lv <= 2 ? 4 : lv <= 4 ? 3 : 2);
+  const garbageCells = (lv) => (lv <= 2 ? 1 : lv >= 7 ? 3 : 2);
   const addGarbage = (count) => {
     setGrid(prev => {
       const empties = [];
@@ -771,11 +794,27 @@ function BlockPlacementGame() {
         for (let [r, c] of d.piece.shape) {
           newGrid[(anchor.row + r) * GRID_COLS + (anchor.col + c)] = d.piece.color;
         }
+        const nowMs = Date.now();
+        const fast = adultRef.current && lastPlaceRef.current && (nowMs - lastPlaceRef.current) <= 2500;
+        lastPlaceRef.current = nowMs;
+
         let gained = d.piece.shape.length * 10;
         const { cleared, toDelete } = clearLines(newGrid);
         if (cleared > 0) {
-          gained += cleared * 100;
-          sfxClear(cleared);
+          let clearPts = cleared * 100;
+          if (adultRef.current) {
+            comboRef.current += 1;                       // extend the streak
+            const mult = Math.min(comboRef.current, comboCap(levelRef.current));
+            clearPts *= mult;
+            sfxClear(cleared, comboRef.current);         // pitch rises with the streak
+            if (comboRef.current >= 2) {
+              setComboFlash(mult);
+              setTimeout(() => setComboFlash(0), 900);
+            }
+          } else {
+            sfxClear(cleared);
+          }
+          gained += clearPts;
           setClearingCells(toDelete);
           spawnParticles(toDelete, newGrid);
           setCelebrating(true);
@@ -802,9 +841,11 @@ function BlockPlacementGame() {
           }, 500);
           setTimeout(() => setRobotCelebrate(false), 2600);
         } else {
+          if (adultRef.current) comboRef.current = 0;   // a non-clearing move breaks the streak
           setGrid(newGrid);
           sfxPlace();
         }
+        if (fast) gained = Math.round(gained * 1.25);    // speed bonus (Hard only)
         setScore(s => s + gained);
         setTray(prev => {
           const next = prev.map((p, i) => (i === d.fromIdx ? null : p));
@@ -812,8 +853,9 @@ function BlockPlacementGame() {
         });
         if (adultRef.current) {
           placeCountRef.current += 1;
-          if (placeCountRef.current % 3 === 0) {
-            setTimeout(() => addGarbage(2), 560); // land after any line-clear removal
+          if (placeCountRef.current % garbageInterval(levelRef.current) === 0) {
+            const cells = garbageCells(levelRef.current);
+            setTimeout(() => addGarbage(cells), 560); // land after any line-clear removal
           }
         }
         placed = true;
@@ -885,6 +927,9 @@ function BlockPlacementGame() {
     setLevel(1);
     setLevelingUp(false);
     placeCountRef.current = 0;
+    comboRef.current = 0;
+    lastPlaceRef.current = 0;
+    setComboFlash(0);
     setSwapsLeft(3);
     setGameOver(false);
     setScoreSubmitted(false);
@@ -937,6 +982,12 @@ function BlockPlacementGame() {
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        @keyframes comboPop {
+          0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+          30%  { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+          70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(1.06); }
+        }
         @keyframes goStrobe {
           0%   { filter: drop-shadow(0 0 14px rgba(255,23,68,1)) brightness(1.25) saturate(1.3); }
           50%  { filter: drop-shadow(0 0 4px rgba(255,23,68,0.35)) brightness(0.7) saturate(0.85); }
@@ -1177,7 +1228,7 @@ function BlockPlacementGame() {
               ✓ Done
             </button>
             <div style={{ fontFamily: MONO, fontSize: '11px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', letterSpacing: '1px', marginTop: '4px' }}>
-              Rev 1 · 2026-06-30
+              Rev 2 · 2026-06-30
             </div>
           </div>
         </div>
@@ -1285,6 +1336,12 @@ function BlockPlacementGame() {
               ✓ Done
             </button>
           </div>
+        </div>
+      )}
+      {/* Combo flash (Hard mode) */}
+      {comboFlash > 0 && (
+        <div style={{ position: 'fixed', left: '50%', top: '34%', transform: 'translate(-50%, -50%)', zIndex: 90, pointerEvents: 'none', fontFamily: ORBITRON, fontWeight: 900, fontSize: (30 + comboFlash * 8) + 'px', color: '#FFEA00', textShadow: '0 0 18px #FF1744, 0 0 8px #FFEA00', letterSpacing: '2px', animation: 'comboPop 0.9s ease-out' }}>
+          COMBO ×{comboFlash}
         </div>
       )}
       {/* Developer credit, fixed to the bottom-left so it never affects the game layout */}
