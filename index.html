@@ -583,7 +583,7 @@ function BlockPlacementGame() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [lbBusy, setLbBusy] = useState(false);
   const [lbMode, setLbMode] = useState('kids');
-  const APP_REV = 4;
+  const APP_REV = 5;
   const [screen, setScreen] = useState('tap');   // 'tap' -> 'intro' -> 'game'
   const songRef = useRef(null);
   const [danceIdx, setDanceIdx] = useState(0);
@@ -1585,10 +1585,33 @@ function BlockPlacementGame() {
   </script>
   <script>
     if ('serviceWorker' in navigator) {
+      // When a newly-installed worker takes control, reload once so the fresh page shows immediately.
+      var swReloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (swReloaded) return;
+        swReloaded = true;
+        window.location.reload();
+      });
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('sw.js').then(function (reg) {
           if (reg.update) { try { reg.update(); } catch (e) {} }
+          // If an updated worker is found, let it activate (sw.js calls skipWaiting on install).
+          reg.addEventListener('updatefound', function () {
+            var nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', function () {
+              // New worker installed while an old one controls the page → it will activate and trigger controllerchange.
+            });
+          });
         }).catch(function () {});
+        // Proactively check for updates when the app regains focus (home-screen PWA reopen).
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') {
+            navigator.serviceWorker.getRegistration().then(function (reg) {
+              if (reg && reg.update) { try { reg.update(); } catch (e) {} }
+            });
+          }
+        });
       });
     }
   </script>
