@@ -386,8 +386,8 @@ function BlockPlacementGame() {
     const chromeW = 2 * 8 + 2 * 3 + (GRID_COLS - 1) * GAP;
     const chromeH = 2 * 8 + 2 * 3 + (GRID_ROWS - 1) * GAP;
     const bw = (Math.min(vw - 12, 540) - chromeW) / GRID_COLS;
-    const bh = (vh - 210 - chromeH) / GRID_ROWS;   // grid scale matched to target screenshot (original value)
-    const block = Math.max(20, Math.min(72, Math.floor(Math.min(bw, bh))));
+    const bh = (vh - 400 - chromeH) / GRID_ROWS;   // large reserve so grid stays short and bottom is visible
+    const block = Math.max(20, Math.min(46, Math.floor(Math.min(bw, bh))));  // hard cap at 46 keeps grid small
     return { block };
   };
   const [layout, setLayout] = useState(computeLayout);
@@ -400,15 +400,20 @@ function BlockPlacementGame() {
   const BLOCK_SIZE = layout.block;
   const land = false;
   const TRAY_CELL = Math.max(14, Math.min(22, Math.round(BLOCK_SIZE * 0.46)));
-  // Shrink the grid until the whole game fits inside the visible container (no chopping)
+  // Deterministically fit the grid: measure everything that is NOT the grid,
+  // then size blocks so the grid exactly fills the remaining visible height.
   React.useLayoutEffect(() => {
-    const c = containerRef.current; if (!c) return;
-    // Use the container's OWN visible height, not window.innerHeight (which can be larger in in-app webviews)
-    const visible = c.clientHeight;
-    const overflow = c.scrollHeight - visible;
-    if (overflow > 1 && BLOCK_SIZE > 18) {
-      const step = Math.max(1, Math.ceil(overflow / GRID_ROWS));
-      setLayout(l => ({ ...l, block: Math.max(18, l.block - step) }));
+    const c = containerRef.current, g = gridRef.current;
+    if (!c || !g) return;
+    const visible = c.clientHeight;                 // true visible area (dvh minus padding handled by box)
+    const gridH = g.getBoundingClientRect().height; // current grid height
+    const nonGrid = c.scrollHeight - gridH;         // header + tray + buttons + credit + gaps
+    const chromeH = 2 * 8 + 2 * 3 + (GRID_ROWS - 1) * GAP; // grid's own padding/border/gaps
+    const avail = visible - nonGrid - 16;           // 16px safety so bottom is never chopped
+    const fitBlock = Math.floor((avail - chromeH) / GRID_ROWS);
+    const target = Math.max(18, Math.min(46, fitBlock));  // cap 46 keeps grid small
+    if (target !== BLOCK_SIZE && Math.abs(target - BLOCK_SIZE) >= 1) {
+      setLayout(l => ({ ...l, block: target }));
     }
   }, [BLOCK_SIZE]);
 
