@@ -1,8 +1,9 @@
 /* Space Blocks service worker.
    Strategy: network-first for the page so a fresh index.html loads whenever the
    device is online (that's what makes the home-screen app auto-update), with a
-   cached copy as an offline fallback. Bump SW_VERSION only if you change THIS file. */
-const SW_VERSION = 'space-blocks-v3';
+   cached copy as an offline fallback. Bump SW_VERSION every release so the browser
+   detects a new worker, clears the old cache, and takes control immediately. */
+const SW_VERSION = 'space-blocks-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
