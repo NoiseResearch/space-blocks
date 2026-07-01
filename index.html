@@ -549,6 +549,7 @@ function BlockPlacementGame() {
   const [initials, setInitials] = useState('');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [lbBusy, setLbBusy] = useState(false);
+  const [lbMode, setLbMode] = useState('kids');
   const LINES_PER_LEVEL = 5;
 
   const [drag, setDrag] = useState(null);
@@ -847,25 +848,29 @@ function BlockPlacementGame() {
     };
   }, [drag, moveDrag, endDrag]);
 
-  // ---- Global leaderboard (Firebase Firestore) ----
+  // ---- Global leaderboard (Firebase Firestore), separate boards per mode ----
   const lbDb = () => (typeof window !== 'undefined' && window.__db ? window.__db : null);
-  const fetchTopScores = () => {
+  const collFor = (modeKey) => (modeKey === 'hard' ? 'scores_hard' : 'scores_kids');
+  const fetchTopScores = (modeKey) => {
+    const key = modeKey || lbMode;
     const db = lbDb(); if (!db) return;
     setLbBusy(true);
-    db.collection('scores').orderBy('score', 'desc').limit(10).get()
+    db.collection(collFor(key)).orderBy('score', 'desc').limit(10).get()
       .then(snap => { setTopScores(snap.docs.map(d => d.data())); setLbBusy(false); })
       .catch(() => setLbBusy(false));
   };
+  const switchBoard = (key) => { setLbMode(key); fetchTopScores(key); };
   const submitScore = () => {
     const ini = ((initials || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)) || 'AAA';
+    const modeKey = adult ? 'hard' : 'kids';
     const db = lbDb();
-    const finalize = () => { setScoreSubmitted(true); fetchTopScores(); };
+    const finalize = () => { setScoreSubmitted(true); setLbMode(modeKey); fetchTopScores(modeKey); };
     if (!db) { finalize(); return; }
     setLbBusy(true);
-    db.collection('scores').add({ initials: ini, score: score, ts: Date.now() })
+    db.collection(collFor(modeKey)).add({ initials: ini, score: score, ts: Date.now() })
       .then(finalize).catch(finalize);
   };
-  const openLeaderboard = () => { setShowSettings(false); setShowLeaderboard(true); fetchTopScores(); };
+  const openLeaderboard = () => { const k = adult ? 'hard' : 'kids'; setLbMode(k); setShowSettings(false); setShowLeaderboard(true); fetchTopScores(k); };
 
   const resetGame = () => {
     setGrid(Array(GRID_ROWS * GRID_COLS).fill(null));
@@ -1203,7 +1208,11 @@ function BlockPlacementGame() {
               </div>
             ) : (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '2px', textShadow: '0 0 8px #FFD700', marginBottom: '2px' }}>🏆 Top Scores</div>
+                <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '15px', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '2px', textShadow: '0 0 8px #FFD700', marginBottom: '2px' }}>🏆 {lbMode === 'hard' ? 'Hard' : 'Kids'} Top Scores</div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '4px' }}>
+                  <button onClick={() => switchBoard('kids')} style={{ flex: 1, fontFamily: ORBITRON, fontWeight: 900, fontSize: '12px', padding: '7px', borderRadius: '8px', border: '2px solid #00E676', background: lbMode === 'kids' ? 'rgba(0,230,118,0.3)' : 'rgba(0,230,118,0.08)', color: '#00E676', cursor: 'pointer', touchAction: 'manipulation' }}>🧸 Kids</button>
+                  <button onClick={() => switchBoard('hard')} style={{ flex: 1, fontFamily: ORBITRON, fontWeight: 900, fontSize: '12px', padding: '7px', borderRadius: '8px', border: '2px solid #FF1744', background: lbMode === 'hard' ? 'rgba(255,23,68,0.3)' : 'rgba(255,23,68,0.08)', color: '#FF1744', cursor: 'pointer', touchAction: 'manipulation' }}>🔥 Hard</button>
+                </div>
                 {lbBusy && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888' }}>Loading…</div>}
                 {!lbBusy && topScores.length === 0 && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888' }}>No scores yet — you're first!</div>}
                 {topScores.map((s, i) => (
@@ -1255,6 +1264,10 @@ function BlockPlacementGame() {
             style={{ width: '100%', maxWidth: '340px', background: 'rgba(15,15,18,0.98)', border: '3px solid #FFD700', borderRadius: '14px', boxShadow: '0 0 28px rgba(255,215,0,0.45)', padding: '22px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '20px', color: '#FFD700', textTransform: 'uppercase', letterSpacing: '2px', textAlign: 'center', textShadow: '0 0 10px #FFD700' }}>
               🏆 Leaderboard
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '2px' }}>
+              <button onClick={() => switchBoard('kids')} style={{ flex: 1, fontFamily: ORBITRON, fontWeight: 900, fontSize: '12px', padding: '8px', borderRadius: '8px', border: '2px solid #00E676', background: lbMode === 'kids' ? 'rgba(0,230,118,0.3)' : 'rgba(0,230,118,0.08)', color: '#00E676', cursor: 'pointer', touchAction: 'manipulation' }}>🧸 Kids</button>
+              <button onClick={() => switchBoard('hard')} style={{ flex: 1, fontFamily: ORBITRON, fontWeight: 900, fontSize: '12px', padding: '8px', borderRadius: '8px', border: '2px solid #FF1744', background: lbMode === 'hard' ? 'rgba(255,23,68,0.3)' : 'rgba(255,23,68,0.08)', color: '#FF1744', cursor: 'pointer', touchAction: 'manipulation' }}>🔥 Hard</button>
             </div>
             {lbBusy && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888', textAlign: 'center' }}>Loading…</div>}
             {!lbBusy && topScores.length === 0 && <div style={{ fontFamily: MONO, fontSize: '12px', color: '#888', textAlign: 'center' }}>No scores yet</div>}
