@@ -791,6 +791,7 @@ function BlockPlacementGame() {
   // Adult-only "garbage": drop a few junk cells into random empty squares so the
   // board steadily fills up, making the game faster and easier to get stuck in.
   const placeCountRef = useRef(0);
+  const songFadedRef = useRef(false);    // fade intro.mp3 exactly once, on the first block placed
   const comboRef = useRef(0);            // consecutive clearing placements (Hard only)
   const lastPlaceRef = useRef(0);        // timestamp for the speed bonus
   const levelRef = useRef(1);
@@ -882,6 +883,7 @@ function BlockPlacementGame() {
         }
         if (fast) gained = Math.round(gained * 1.25);    // speed bonus (Hard only)
         setScore(s => s + gained);
+        if (!songFadedRef.current) { songFadedRef.current = true; fadeSong(); }  // stop intro.mp3 on first block
         setTray(prev => {
           const next = prev.map((p, i) => (i === d.fromIdx ? null : p));
           return next.every(p => p === null) ? makeTray() : next;
@@ -969,6 +971,7 @@ function BlockPlacementGame() {
         songRef.current = a;
       }
       songRef.current.volume = 0.9;
+      songFadedRef.current = false;   // allow the next first-block placement to fade the song
       try { songRef.current.currentTime = 0; } catch (e) {}
       const p = songRef.current.play();
       if (p && p.catch) p.catch(() => {});
@@ -1412,7 +1415,7 @@ function BlockPlacementGame() {
 
       {/* Screen 2: SPACE BLOCKS intro — song plays, logo + dancing robot, tap to play */}
       {screen === 'intro' && (
-        <div onClick={() => { fadeSong(); setScreen('game'); setTimeout(() => speakReadyGo(), 500); }}
+        <div onClick={() => { setScreen('mode'); }}
           style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', background: 'transparent', cursor: 'pointer', padding: 'calc(12vh + env(safe-area-inset-top)) 24px calc(8vh + env(safe-area-inset-bottom))' }}>
           <div style={{ animation: 'zoomFromSpace 3.4s cubic-bezier(0.16, 0.8, 0.3, 1) both', flexShrink: 0 }}>
             <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: 'clamp(40px, 14vw, 78px)', color: '#EAFBFF', letterSpacing: '5px', textAlign: 'center', lineHeight: 0.92, animation: 'titlePulse 2.6s ease-in-out 3.4s infinite' }}>
@@ -1429,6 +1432,29 @@ function BlockPlacementGame() {
           })()}
           <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: 'clamp(16px, 5vw, 22px)', color: '#FFEA00', textShadow: '0 0 10px #FFEA00', letterSpacing: '2px', animation: 'tapReveal 1.2s ease-out 6.4s both, tapBlink 1.1s ease-in-out 7.6s infinite', flexShrink: 0 }}>
             TAP TO PLAY
+          </div>
+        </div>
+      )}
+
+      {/* Screen 3: MODE SELECT — choose Kids or Hard. Song keeps playing until the first block is placed. */}
+      {screen === 'mode' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '22px', background: 'rgba(0,0,0,0.55)', padding: 'calc(6vh + env(safe-area-inset-top)) 24px calc(6vh + env(safe-area-inset-bottom))' }}>
+          <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: 'clamp(22px, 7vw, 34px)', color: '#00FF00', textShadow: '0 0 14px #00FF00', letterSpacing: '3px', textAlign: 'center', marginBottom: '4px' }}>
+            CHOOSE MODE
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', width: '100%', maxWidth: '340px' }}>
+            {/* Kids box */}
+            <div onClick={() => { adultRef.current = false; setAdult(false); resetGame(); setScreen('game'); }}
+              style={{ cursor: 'pointer', touchAction: 'manipulation', borderRadius: '16px', border: '3px solid #00E676', background: 'rgba(0,230,118,0.12)', boxShadow: '0 0 22px rgba(0,230,118,0.4)', padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontSize: '46px', lineHeight: 1 }}>🧸</div>
+              <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '22px', color: '#00E676', textTransform: 'uppercase', letterSpacing: '2px', textShadow: '0 0 10px #00E676' }}>Kids Mode</div>
+            </div>
+            {/* Hard box */}
+            <div onClick={() => { adultRef.current = true; setAdult(true); resetGame(); setScreen('game'); }}
+              style={{ cursor: 'pointer', touchAction: 'manipulation', borderRadius: '16px', border: '3px solid #FF1744', background: 'rgba(255,23,68,0.12)', boxShadow: '0 0 22px rgba(255,23,68,0.4)', padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontSize: '46px', lineHeight: 1 }}>🔥</div>
+              <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '22px', color: '#FF1744', textTransform: 'uppercase', letterSpacing: '2px', textShadow: '0 0 10px #FF1744' }}>Hard Mode</div>
+            </div>
           </div>
         </div>
       )}
