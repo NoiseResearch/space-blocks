@@ -564,6 +564,11 @@ function BlockPlacementGame() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [lbBusy, setLbBusy] = useState(false);
   const [lbMode, setLbMode] = useState('kids');
+  const APP_REV = 3;
+  const [showHowTo, setShowHowTo] = useState(false);
+  const [showUpdate, setShowUpdate] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState('');
+  const [updateBusy, setUpdateBusy] = useState(false);
   const LINES_PER_LEVEL = 5;
 
   const [drag, setDrag] = useState(null);
@@ -913,6 +918,19 @@ function BlockPlacementGame() {
       .then(finalize).catch(finalize);
   };
   const openLeaderboard = () => { const k = adult ? 'hard' : 'kids'; setLbMode(k); setShowSettings(false); setShowLeaderboard(true); fetchTopScores(k); };
+  const checkForUpdates = () => {
+    setShowSettings(false); setShowUpdate(true); setUpdateBusy(true); setUpdateMsg('');
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => {
+        const latest = (d && typeof d.rev === 'number') ? d.rev : null;
+        if (latest === null) setUpdateMsg('unknown');
+        else if (latest > APP_REV) setUpdateMsg('stale:' + latest);
+        else setUpdateMsg('current');
+        setUpdateBusy(false);
+      })
+      .catch(() => { setUpdateMsg('error'); setUpdateBusy(false); });
+  };
 
   const resetGame = () => {
     setGrid(Array(GRID_ROWS * GRID_COLS).fill(null));
@@ -1223,12 +1241,22 @@ function BlockPlacementGame() {
               🏆 Leaderboard
             </button>
 
+            <button onClick={() => { setShowSettings(false); setShowHowTo(true); }}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '13px', borderRadius: '10px', border: '3px solid #B388FF', background: 'rgba(179,136,255,0.14)', color: '#B388FF', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', touchAction: 'manipulation' }}>
+              📖 How to Play
+            </button>
+
+            <button onClick={checkForUpdates}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '13px', borderRadius: '10px', border: '3px solid #00E5FF', background: 'rgba(0,229,255,0.14)', color: '#00E5FF', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', touchAction: 'manipulation' }}>
+              🔄 Check for Updates
+            </button>
+
             <button onClick={() => setShowSettings(false)}
               style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', marginTop: '4px' }}>
               ✓ Done
             </button>
             <div style={{ fontFamily: MONO, fontSize: '11px', color: 'rgba(255,255,255,0.5)', textAlign: 'center', letterSpacing: '1px', marginTop: '4px' }}>
-              Rev 2 · 2026-06-30
+              Rev {APP_REV} · 2026-06-30
             </div>
           </div>
         </div>
@@ -1338,6 +1366,66 @@ function BlockPlacementGame() {
           </div>
         </div>
       )}
+      {/* How to Play overlay */}
+      {showHowTo && (
+        <div onClick={() => setShowHowTo(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: '360px', maxHeight: '80vh', overflowY: 'auto', background: 'rgba(15,15,18,0.98)', border: '3px solid #B388FF', borderRadius: '14px', boxShadow: '0 0 28px rgba(179,136,255,0.45)', padding: '22px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '20px', color: '#B388FF', textTransform: 'uppercase', letterSpacing: '2px', textAlign: 'center', textShadow: '0 0 10px #B388FF' }}>
+              📖 How to Play
+            </div>
+            <div style={{ fontFamily: INTER, fontSize: '13px', color: '#DDE3EE', lineHeight: 1.5 }}>
+              <p style={{ margin: '0 0 8px' }}>Drag the blocks from <b>Your Blocks</b> onto the grid.</p>
+              <p style={{ margin: '0 0 8px' }}>Fill a whole <b>row or column</b> to clear it and score points.</p>
+              <p style={{ margin: '0 0 8px' }}>You get 3 blocks at a time — a new set appears once you place all three.</p>
+              <p style={{ margin: '0 0 8px' }}>It's <b>Game Over</b> when none of your blocks fit anywhere on the grid.</p>
+              <p style={{ margin: '10px 0 4px', color: '#00E676', fontWeight: 700 }}>🧸 Kids Mode</p>
+              <p style={{ margin: '0 0 8px' }}>Easy shapes, relaxed pace, unlimited reshuffles. Made for little ones.</p>
+              <p style={{ margin: '6px 0 4px', color: '#FF1744', fontWeight: 700 }}>🔥 Hard Mode</p>
+              <p style={{ margin: '0 0 8px' }}>Real tetrominoes, gray junk blocks slowly fill the board, and only 3 swaps. It gets tougher every level. Clear lines on back-to-back moves to build a <b>combo</b> for bonus points — place fast for an extra speed bonus!</p>
+              <p style={{ margin: '6px 0 0' }}>At Game Over, enter your initials to post your score to the global <b>Leaderboard</b>.</p>
+            </div>
+            <button onClick={() => setShowHowTo(false)}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', marginTop: '4px' }}>
+              ✓ Got It
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Check for Updates overlay */}
+      {showUpdate && (
+        <div onClick={() => setShowUpdate(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: '340px', background: 'rgba(15,15,18,0.98)', border: '3px solid #00E5FF', borderRadius: '14px', boxShadow: '0 0 28px rgba(0,229,255,0.45)', padding: '22px', display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'center' }}>
+            <div style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '18px', color: '#00E5FF', textTransform: 'uppercase', letterSpacing: '2px', textShadow: '0 0 10px #00E5FF' }}>
+              🔄 Updates
+            </div>
+            {updateBusy && <div style={{ fontFamily: MONO, fontSize: '13px', color: '#CFE3FF' }}>Checking…</div>}
+            {!updateBusy && updateMsg === 'current' && (
+              <div style={{ fontFamily: MONO, fontSize: '13px', color: '#00E676', lineHeight: 1.5 }}>✅ You're on the latest version.<br />Rev {APP_REV}</div>
+            )}
+            {!updateBusy && updateMsg.indexOf('stale:') === 0 && (
+              <div style={{ fontFamily: MONO, fontSize: '13px', color: '#FFEA00', lineHeight: 1.5 }}>
+                ⚠️ Update available!<br />You have Rev {APP_REV}, latest is Rev {updateMsg.split(':')[1]}.
+                <div style={{ fontFamily: INTER, fontSize: '12px', color: '#BFC8D8', marginTop: '10px', lineHeight: 1.5 }}>
+                  Fully close the game and reopen it — it should update itself. If it's on your home screen and still shows the old version, remove the icon and add it again from Safari.
+                </div>
+              </div>
+            )}
+            {!updateBusy && (updateMsg === 'error' || updateMsg === 'unknown') && (
+              <div style={{ fontFamily: MONO, fontSize: '13px', color: '#888', lineHeight: 1.5 }}>Couldn't check right now.<br />You're on Rev {APP_REV}.</div>
+            )}
+            <button onClick={() => setShowUpdate(false)}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation' }}>
+              ✓ Done
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Combo flash (Hard mode) */}
       {comboFlash > 0 && (
         <div style={{ position: 'fixed', left: '50%', top: '34%', transform: 'translate(-50%, -50%)', zIndex: 90, pointerEvents: 'none', fontFamily: ORBITRON, fontWeight: 900, fontSize: (30 + comboFlash * 8) + 'px', color: '#FFEA00', textShadow: '0 0 18px #FF1744, 0 0 8px #FFEA00', letterSpacing: '2px', animation: 'comboPop 0.9s ease-out' }}>
@@ -1355,6 +1443,15 @@ function BlockPlacementGame() {
 
 ;(function(){ var r=document.getElementById('root'); r.innerHTML=''; ReactDOM.createRoot(r).render(React.createElement(BlockPlacementGame)); })();
 
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').then(function (reg) {
+          if (reg.update) { try { reg.update(); } catch (e) {} }
+        }).catch(function () {});
+      });
+    }
   </script>
 </body>
 </html>
