@@ -8,13 +8,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Space Blocks" />
   <meta name="theme-color" content="#0a0a0a" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="supported-color-schemes" content="dark" />
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="manifest" href="manifest.webmanifest" />
   <title>Space Blocks</title>
   <style>
-    html, body { margin: 0; padding: 0; background: #0a0a0a; color: #e8e8e8; height: 100%;
+    html, body { margin: 0; padding: 0; background: #0a0a0a; color: #e8e8e8; height: 100%; color-scheme: dark; forced-color-adjust: none;
       overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
       -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
     #root { height: 100%; }
@@ -398,6 +400,7 @@ function BlockPlacementGame() {
     return () => { window.removeEventListener('resize', onR); window.removeEventListener('orientationchange', onR); };
   }, []);
   const BLOCK_SIZE = layout.block;
+  const CELL_RADIUS = Math.max(4, Math.round(BLOCK_SIZE * 0.16)); // corners scale with block so they look identical on every screen
   const land = false;
   const TRAY_CELL = Math.max(14, Math.min(22, Math.round(BLOCK_SIZE * 0.46)));
   // Deterministically fit the grid: measure everything that is NOT the grid,
@@ -583,7 +586,7 @@ function BlockPlacementGame() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [lbBusy, setLbBusy] = useState(false);
   const [lbMode, setLbMode] = useState('kids');
-  const APP_REV = 5;
+  const APP_REV = 6;
   const [screen, setScreen] = useState('tap');   // 'tap' -> 'intro' -> 'game'
   const songRef = useRef(null);
   const [danceIdx, setDanceIdx] = useState(0);
@@ -810,7 +813,7 @@ function BlockPlacementGame() {
       const g = [...prev];
       for (let k = 0; k < count && empties.length; k++) {
         const j = Math.floor(Math.random() * empties.length);
-        g[empties[j]] = '#5A5F6B'; // gray junk block
+        g[empties[j]] = '#8A90A0'; // gray junk block (brighter so it renders solid on all browsers)
         empties.splice(j, 1);
       }
       return g;
@@ -1202,7 +1205,7 @@ function BlockPlacementGame() {
               width: BLOCK_SIZE, height: BLOCK_SIZE,
               background: color ? color : isPreview ? (ok ? previewColor + 'aa' : 'rgba(255,23,68,0.3)') : 'rgba(20, 20, 20, 0.95)',
               border: color ? '2px solid rgba(255,255,255,0.7)' : isPreview ? '2px solid ' + (ok ? '#00FF00' : '#FF1744') : '1px solid #1a1a1a',
-              borderRadius: color ? '8px' : '0px',
+              borderRadius: color ? CELL_RADIUS + 'px' : '0px',
               boxShadow: color ? '0 0 12px ' + color + '99, inset 0 -3px 8px rgba(0,0,0,0.4)' : 'inset 0 0 8px rgba(0,0,0,0.5)',
               transition: 'background 0.06s, border-color 0.06s, border-radius 0.06s',
               animation: isClearing ? 'clearLine 0.5s cubic-bezier(0.36, 0, 0.66, -0.56) forwards' : 'none',
