@@ -586,7 +586,7 @@ function BlockPlacementGame() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [lbBusy, setLbBusy] = useState(false);
   const [lbMode, setLbMode] = useState('kids');
-  const APP_REV = 6;
+  const APP_REV = 7;
   const [screen, setScreen] = useState('tap');   // 'tap' -> 'intro' -> 'game'
   const songRef = useRef(null);
   const [danceIdx, setDanceIdx] = useState(0);
@@ -602,6 +602,31 @@ function BlockPlacementGame() {
   const [showUpdate, setShowUpdate] = useState(false);
   const [updateMsg, setUpdateMsg] = useState('');
   const [updateBusy, setUpdateBusy] = useState(false);
+  const [forcing, setForcing] = useState(false);
+
+  // Nukes the service worker + all caches, then hard-reloads so the freshest files load.
+  // This is the one-tap fix if a device ever gets stuck on an old cached version.
+  const forceUpdate = async () => {
+    setForcing(true);
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if (window.caches && caches.keys) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) {}
+    // Cache-busting reload so even the HTML itself is refetched from the network.
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.set('u', Date.now());
+      window.location.replace(u.toString());
+    } catch (e) {
+      window.location.reload();
+    }
+  };
   const LINES_PER_LEVEL = 5;
 
   const [drag, setDrag] = useState(null);
@@ -1557,13 +1582,20 @@ function BlockPlacementGame() {
               <div style={{ fontFamily: MONO, fontSize: '13px', color: '#FFEA00', lineHeight: 1.5 }}>
                 ⚠️ Update available!<br />You have Rev {APP_REV}, latest is Rev {updateMsg.split(':')[1]}.
                 <div style={{ fontFamily: INTER, fontSize: '12px', color: '#BFC8D8', marginTop: '10px', lineHeight: 1.5 }}>
-                  Fully close the game and reopen it — it should update itself. If it's on your home screen and still shows the old version, remove the icon and add it again from Safari.
+                  Tap <b>Force Update Now</b> below to grab the latest version instantly.
                 </div>
               </div>
             )}
             {!updateBusy && (updateMsg === 'error' || updateMsg === 'unknown') && (
               <div style={{ fontFamily: MONO, fontSize: '13px', color: '#888', lineHeight: 1.5 }}>Couldn't check right now.<br />You're on Rev {APP_REV}.</div>
             )}
+            <button onClick={forceUpdate} disabled={forcing}
+              style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #00E5FF', background: forcing ? 'rgba(0,229,255,0.28)' : 'rgba(0,229,255,0.16)', color: '#00E5FF', cursor: forcing ? 'wait' : 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation', boxShadow: '0 0 14px rgba(0,229,255,0.4)', opacity: forcing ? 0.8 : 1 }}>
+              {forcing ? 'Updating…' : '⟳ Force Update Now'}
+            </button>
+            <div style={{ fontFamily: INTER, fontSize: '11px', color: '#8892A0', lineHeight: 1.4, marginTop: '-4px' }}>
+              Stuck on an old version? Tap Force Update to clear the cache and reload the latest.
+            </div>
             <button onClick={() => setShowUpdate(false)}
               style={{ fontFamily: ORBITRON, fontWeight: 900, fontSize: '14px', padding: '12px', borderRadius: '10px', border: '3px solid #FFEA00', background: 'rgba(255,234,0,0.14)', color: '#FFEA00', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '2px', touchAction: 'manipulation' }}>
               ✓ Done
